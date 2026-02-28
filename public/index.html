@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Garage">
+  <link rel="apple-touch-icon" href="/icon-180.png">
+  <link rel="manifest" href="/manifest.json">
+  <title>Garage</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #111;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: env(safe-area-inset-top) 1rem env(safe-area-inset-bottom);
+      gap: 2.5rem;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .state-label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #555;
+      transition: color 0.4s;
+      min-height: 1.2em;
+    }
+    .state-label.is-open   { color: #4ade80; }
+    .state-label.is-closed { color: #f87171; }
+    .state-label.is-moving { color: #facc15; }
+
+    .btn {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      border: 3px solid #333;
+      background: #1c1c1e;
+      color: #555;
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: transform 0.12s, background 0.3s, color 0.3s, border-color 0.3s;
+      -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .btn:active:not(:disabled) { transform: scale(0.93); }
+    .btn.action-open  { background: #052e16; color: #4ade80; border-color: #166534; }
+    .btn.action-close { background: #2d0a0a; color: #f87171; border-color: #7f1d1d; }
+    .btn:disabled { opacity: 0.35; cursor: default; }
+
+    .error-label {
+      font-size: 0.75rem;
+      color: #f87171;
+      min-height: 1em;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+  <div class="state-label" id="stateLabel"></div>
+  <button class="btn" id="btn" disabled aria-label="Garage door control"></button>
+  <div class="error-label" id="errorLabel"></div>
+
+  <script>
+    const stateLabel = document.getElementById('stateLabel');
+    const btn        = document.getElementById('btn');
+    const errorLabel = document.getElementById('errorLabel');
+
+    let currentState = null;
+
+    function render(state) {
+      currentState = state;
+      errorLabel.textContent = '';
+
+      stateLabel.className = 'state-label';
+      btn.className = 'btn';
+      btn.disabled = false;
+
+      switch (state) {
+        case 'open':
+          stateLabel.textContent = 'Open';
+          stateLabel.classList.add('is-open');
+          btn.textContent = 'Close';
+          btn.classList.add('action-close');
+          btn.setAttribute('aria-label', 'Close garage door');
+          break;
+
+        case 'closed':
+          stateLabel.textContent = 'Closed';
+          stateLabel.classList.add('is-closed');
+          btn.textContent = 'Open';
+          btn.classList.add('action-open');
+          btn.setAttribute('aria-label', 'Open garage door');
+          break;
+
+        case 'opening':
+          stateLabel.textContent = 'Opening\u2026';
+          stateLabel.classList.add('is-moving');
+          btn.textContent = 'Opening\u2026';
+          btn.disabled = true;
+          break;
+
+        case 'closing':
+          stateLabel.textContent = 'Closing\u2026';
+          stateLabel.classList.add('is-moving');
+          btn.textContent = 'Closing\u2026';
+          btn.disabled = true;
+          break;
+
+        default:
+          stateLabel.textContent = state ?? '';
+          btn.textContent = '?';
+          btn.disabled = true;
+      }
+    }
+
+    async function fetchState() {
+      try {
+        const r = await fetch('/api/state');
+        if (!r.ok) throw new Error(r.status);
+        const { state } = await r.json();
+        render(state);
+      } catch {
+        errorLabel.textContent = 'Cannot reach server';
+      }
+    }
+
+    btn.addEventListener('click', async () => {
+      const action = currentState === 'open' ? 'close' : 'open';
+      btn.disabled = true;
+      try {
+        const r = await fetch(`/api/${action}`, { method: 'POST' });
+        if (!r.ok) throw new Error(r.status);
+        render(action === 'open' ? 'opening' : 'closing');
+      } catch {
+        errorLabel.textContent = 'Action failed \u2014 try again';
+        btn.disabled = false;
+      }
+    });
+
+    fetchState();
+    setInterval(fetchState, 5000);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
