@@ -1,6 +1,6 @@
 services:
   garage-button:
-    build: .
+    image: ghcr.io/benmayne/garage-button:latest
     ports:
       - "3000:3000"
     env_file: .env
