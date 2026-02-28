@@ -17,6 +17,14 @@ if (!HA_URL || !HA_TOKEN) {
 }
 
 const app = express();
+
+const log = (req, event) => {
+  const user = req.headers['cf-access-authenticated-user-email'] || 'unknown';
+  const ip = req.headers['cf-connecting-ip'] || req.ip;
+  console.log(`[${new Date().toISOString()}] ${event} user=${user} ip=${ip}`);
+};
+
+app.get('/', (req, res, next) => { log(req, 'app_load'); next(); });
 app.use(express.static(join(__dirname, 'public')));
 
 const haFetch = (path, options = {}) =>
@@ -42,6 +50,7 @@ app.get('/api/state', async (req, res) => {
 });
 
 app.post('/api/open', async (req, res) => {
+  log(req, 'open');
   try {
     const r = await haFetch('/api/services/cover/open_cover', {
       method: 'POST',
@@ -56,6 +65,7 @@ app.post('/api/open', async (req, res) => {
 });
 
 app.post('/api/close', async (req, res) => {
+  log(req, 'close');
   try {
     const r = await haFetch('/api/services/cover/close_cover', {
       method: 'POST',
